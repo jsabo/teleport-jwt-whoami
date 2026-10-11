@@ -57,12 +57,14 @@ the agent that proxies requests to the application and adds the header.
 1. The user opens the application through Teleport (the Web UI tile, or
    `tsh app login`). Teleport authenticates them and checks that a role allows the
    application.
-2. For every request, the application service asks the Auth Service for a JWT:
-   `sub` and `username` are the Teleport username, `roles` and `traits` are the
-   user's, `iss` is the cluster name, `aud` is the application's `uri`, and `exp` is
-   the session's expiry. The Auth Service signs it with the cluster's JWT signer
-   certificate authority. The service puts the token in the
-   `Teleport-Jwt-Assertion` header and forwards the request.
+2. When an app session first reaches the application service, it asks the Auth
+   Service for a JWT: `sub` and `username` are the Teleport username, `roles` and
+   `traits` are the user's, `iss` is the cluster name, `aud` is the application's
+   `uri`, and `exp` is the session's expiry. The Auth Service signs it with the
+   cluster's JWT signer certificate authority. The service keeps the token with
+   the session and puts it in the `Teleport-Jwt-Assertion` header of every
+   request it forwards for that session, so the `jti` stays the same across
+   requests until the session ends.
 3. This app fetches the cluster's JWKS once (cached, refreshed when it sees an
    unknown key id), verifies the signature, then checks issuer, audience, expiry
    and not-before. Only then does it show the identity as trusted.
@@ -125,9 +127,11 @@ eval "$(tsh app config --format=curl jwt-whoami)"/whoami.json
 ```
 
 The JSON has `"verified": true`, the `identity` block, and one entry per check.
-Change `jwt_claims` to `none` on the application resource and reload: the identity
-block loses its roles and traits with no change to the app, because the token
-itself changed.
+Change `jwt_claims` to `none` on the application resource, then start a new app
+session (`tsh app logout jwt-whoami && tsh app login jwt-whoami`, or sign out of
+the tile and open it again): the identity block loses its roles and traits with no
+change to the app, because the token itself changed. An existing session keeps its
+token until it ends.
 
 ## What the app refuses, and why
 

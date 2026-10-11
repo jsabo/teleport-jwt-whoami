@@ -134,7 +134,7 @@ eval "$(tsh app config --format=curl jwt-whoami)"/whoami.json    # verified: tru
 curl -s http://&lt;this container&gt;:8080/whoami.json                  # verified: false, "no token"</pre>
   </section>
 
-  <footer>generated {{ r.generated_at }} · <a href="/whoami.json">whoami.json</a> · the token is minted per request by the Teleport application service and signed by the cluster's JWT signer certificate authority</footer>
+  <footer>generated {{ r.generated_at }} · <a href="/whoami.json">whoami.json</a> · the token is minted once per app session by the Teleport application service, signed by the cluster's JWT signer certificate authority, and sent on every request of that session</footer>
 </main>
 </body>
 </html>
