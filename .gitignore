@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+
+# anything rendered with real cluster values
+*.local.env
+*.local.yaml

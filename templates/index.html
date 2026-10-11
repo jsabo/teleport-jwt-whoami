@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>jwt-whoami</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Colors follow the Teleport Web UI theme tokens (gravitational/design-system,
+     src/themes/teleport/colors.ts): levels, text opacities, brand, tonal status. */
+  :root {
+    --bg:#0C143D; --surface:#222C59; --elevated:#344179; --popout:#4A5688;
+    --fg:#FFFFFF; --fg-2:rgba(255,255,255,.72); --fg-3:rgba(255,255,255,.54);
+    --line:rgba(255,255,255,.13); --spot:rgba(255,255,255,.07);
+    --brand:#9F85FF; --link:#009EFF;
+    --ok:#00BFA6; --ok-bg:rgba(0,191,166,.18);
+    --bad:#FF6257; --bad-bg:rgba(255,98,87,.18);
+    --warn:#FFAB00; --warn-bg:rgba(255,171,0,.18);
+    --sans: Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: light) { :root {
+    --bg:#F1F2F4; --surface:#FFFFFF; --elevated:#FBFBFC; --popout:#FFFFFF;
+    --fg:#000000; --fg-2:rgba(0,0,0,.72); --fg-3:rgba(0,0,0,.54);
+    --line:rgba(0,0,0,.13); --spot:rgba(0,0,0,.06);
+    --brand:#512FC9; --link:#0073BA;
+    --ok:#007D6B; --ok-bg:rgba(0,125,107,.12);
+    --bad:#CC372D; --bad-bg:rgba(204,55,45,.12);
+    --warn:#A36E00; --warn-bg:rgba(255,171,0,.18);
+  } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 var(--sans); }
+  .top { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .top .in { max-width: 1100px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .mark { width: 14px; height: 14px; border-radius: 4px; background: var(--brand); flex: none; }
+  .top b { font-size: 17px; font-weight: 600; }
+  .crumbs { color: var(--fg-2); font-size: 14px; }
+  .crumbs code, p code, td.sans code { font: 13px var(--mono); color: var(--fg); background: var(--spot); padding: 1px 6px; border-radius: 4px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 20px 32px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin: 0 0 14px; }
+  .card.verdict { border-color: var(--ok); } .card.verdict.bad { border-color: var(--bad); }
+  h2 { font: 600 12px/1.2 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin: 0 0 12px; }
+  h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .id { font: 500 20px/1.3 var(--mono); color: var(--brand); word-break: break-all; margin: 4px 0 12px; }
+  .lede { margin: 0; font-size: 16px; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 5px 12px 5px 0; vertical-align: top; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { color: var(--fg-3); white-space: nowrap; width: 170px; font-size: 14px; }
+  td:not(:first-child) { font: 14px/1.5 var(--mono); word-break: break-all; }
+  td.sans, td .note { font: 13px var(--sans); color: var(--fg-3); }
+  pre { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: auto; font: 13px/1.45 var(--mono); }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font: 600 12px/1.6 var(--sans); vertical-align: 1px; margin: 0 4px 4px 0; }
+  .pill.ok { color: var(--ok); background: var(--ok-bg); }
+  .pill.bad { color: var(--bad); background: var(--bad-bg); }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); }
+  .pill.role { color: var(--brand); background: var(--spot); font-family: var(--mono); font-weight: 500; }
+  .muted { color: var(--fg-3); font-family: var(--sans); }
+  p.explain { margin: 12px 0 0; color: var(--fg-2); font-size: 14px; }
+  a { color: var(--link); text-decoration: none; } a:hover { text-decoration: underline; }
+  button { font: 600 12px var(--sans); color: var(--fg); background: var(--spot); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; cursor: pointer; margin-left: 8px; }
+  footer { color: var(--fg-3); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <span class="mark"></span><b>jwt-whoami</b>
+  <span class="crumbs">
+    cluster <code>{{ r.config.expected_issuer }}</code>
+    {% if r.token and r.token.claims.aud %} · app <code>{{ r.token.claims.aud if r.token.claims.aud is string else r.token.claims.aud | join(', ') }}</code>{% endif %}
+  </span>
+</div></header>
+<main>
+
+  <section class="card verdict{% if not r.verified %} bad{% endif %}">
+    <p class="lede"><span class="pill {{ 'ok' if r.verified else 'bad' }}">{{ 'verified' if r.verified else 'refused' }}</span> {{ r.verdict }}</p>
+  </section>
+
+  <section class="card">
+    <h2>Who Teleport says you are{% if r.token and not r.verified %} <span class="sub">· unverified, shown as sent</span>{% endif %}</h2>
+    {% if r.identity %}
+    <div class="id">{{ r.identity.username }}</div>
+    <table>
+      <tr><td>roles</td><td>{% for role in r.identity.roles %}<span class="pill role">{{ role }}</span>{% else %}<span class="muted">none in the token (the app's <code>jwt_claims</code> setting may exclude them)</span>{% endfor %}</td></tr>
+      {% if r.identity.traits %}
+        {% for key, values in r.identity.traits | dictsort %}
+        <tr><td>trait {{ key }}</td><td>{{ values | join(', ') if values is not string else values }}</td></tr>
+        {% endfor %}
+      {% else %}
+        <tr><td>traits</td><td><span class="muted">none in the token (the app's <code>jwt_claims</code> setting may exclude them)</span></td></tr>
+      {% endif %}
+    </table>
+    {% else %}
+    <div class="muted">no token, so no identity. Teleport did not forward this request.</div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>The header, verified <span class="sub">· what this app checked before trusting the identity above</span></h2>
+    <table>
+      {% for c in r.checks %}
+      <tr><td>{{ c.name }}</td><td><span class="pill {{ 'ok' if c.ok else 'bad' }}">{{ 'ok' if c.ok else 'refused' }}</span> <span class="note">{{ c.detail }}</span></td></tr>
+      {% endfor %}
+    </table>
+    <p class="explain">The signing keys come from <code>{{ r.config.jwks_url }}</code>, the cluster's JSON Web Key Set (JWKS). The token's <code>kid</code> header names the key; nothing in this app is configured with a secret.</p>
+  </section>
+
+  {% if r.token %}
+  <section class="card">
+    <h2>The token <span class="sub">· <code>{{ header_name }}</code>, decoded</span></h2>
+    <table>
+      <tr><td>raw</td><td>{{ r.token.preview }} <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('raw').textContent)">copy</button><span id="raw" hidden>{{ r.token.raw }}</span></td></tr>
+    </table>
+    <pre>{{ pretty(r.token.header) }}</pre>
+    <pre>{{ pretty(r.token.claims) }}</pre>
+    <p class="explain"><code>sub</code> and <code>username</code> are the Teleport user, <code>iss</code> is the cluster that signed, <code>aud</code> is the application's URI as registered in Teleport, and <code>exp</code> is when the token stops being valid. <code>roles</code> and <code>traits</code> follow the application's <code>rewrite.jwt_claims</code> setting.</p>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>Everything else Teleport sent <span class="sub">· the request headers as they reached this app</span></h2>
+    <table>
+      {% for h in r.request_headers %}
+      <tr><td>{{ h.name }}</td><td>{{ h.value }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Without Teleport</h2>
+    <p class="explain" style="margin-top:0">A request that reaches this app without going through the Teleport application service has no <code>{{ header_name }}</code> header and gets this same page with status 401. Two commands show the difference:</p>
+    <pre>tsh app login jwt-whoami
+eval "$(tsh app config --format=curl jwt-whoami)"/whoami.json    # verified: true
+
+curl -s http://&lt;this container&gt;:8080/whoami.json                  # verified: false, "no token"</pre>
+  </section>
+
+  <footer>generated {{ r.generated_at }} · <a href="/whoami.json">whoami.json</a> · the token is minted per request by the Teleport application service and signed by the cluster's JWT signer certificate authority</footer>
+</main>
+</body>
+</html>
